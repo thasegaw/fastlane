@@ -46,5 +46,34 @@ describe Gym do
     it "doesn't find swift when it's not there" do
       expect(Gym::XcodebuildFixes.check_for_swift(pcg_without_swift)).to eq(false)
     end
+
+    describe "#toolchain_folder" do
+      context "toolchain parameter is set to 'com.apple.dt.toolchain.Swift_2_3'" do
+        let(:toolchain) { 'com.apple.dt.toolchain.Swift_2_3' }
+        it "return swift2.3 folder" do
+          options = { project: "./examples/standard/Example.xcodeproj", toolchain: toolchain }
+          Gym.config = FastlaneCore::Configuration.create(Gym::Options.available_options, options)
+
+          expect(Gym::XcodebuildFixes.toolchain_folder).to eq('Swift_2.3.xctoolchain')
+        end
+      end
+      context "toolchain parameter is not set" do
+        it "return default toolchain folder" do
+          options = { project: "./examples/standard/Example.xcodeproj"}
+          Gym.config = FastlaneCore::Configuration.create(Gym::Options.available_options, options)
+
+          expect(Gym::XcodebuildFixes.toolchain_folder).to eq('XcodeDefault.xctoolchain')
+        end
+      end
+      context "toolchain parameter is set to invalid value" do
+        let(:toolchain) { 'com.apple.dt.toolchain.Swift_2_0' }
+        it "return default toolchain folder" do
+          options = { project: "./examples/standard/Example.xcodeproj", toolchain: toolchain}
+          Gym.config = FastlaneCore::Configuration.create(Gym::Options.available_options, options)
+
+          expect(Gym::XcodebuildFixes.toolchain_folder).to eq('XcodeDefault.xctoolchain')
+        end
+      end
+    end
   end
 end

@@ -27,7 +27,7 @@ module Gym
           ipa_swift_frameworks.each do |path|
             framework = File.basename(path)
 
-            FileUtils.copy_file("#{Xcode.xcode_path}/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphoneos/#{framework}", File.join(swift_support, framework))
+            FileUtils.copy_file("#{Xcode.xcode_path}/Toolchains/#{toolchain_folder}/usr/lib/swift/iphoneos/#{framework}", File.join(swift_support, framework))
           end
 
           # Add "SwiftSupport" to the .ipa archive
@@ -44,6 +44,14 @@ module Gym
                                                     end)
           end
         end
+      end
+
+      # @return the folder name of toolchain
+      def toolchain_folder
+        toolchain = "XcodeDefault.xctoolchain"
+        toolchain = "Swift_2.3.xctoolchain" if Gym.config[:toolchain] == "com.apple.dt.toolchain.Swift_2_3"
+
+        toolchain
       end
 
       # @param the PackageCommandGenerator
