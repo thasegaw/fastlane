@@ -36,15 +36,15 @@ module Fastlane
       }.freeze
 
       def self.run(params)
+        if Actions.lane_context[SharedValues::SCAN_STATUS_EXCEPTION]
+          UI.important("Skipping 'slather' because exception has occurred at 'scan'")
+          return
+        end
+
         # This will fail if using Bundler. Skip the check rather than needing to
         # require bundler
         unless params[:use_bundle_exec]
           Actions.verify_gem!('slather')
-        end
-
-        if Actions.lane_context[SharedValues::SCAN_FAILED_DUE_TO_EXCEPTION]
-          UI.important('Skip slather action due to Scan was failed caused by Exception')
-          return
         end
 
         validate_params!(params)

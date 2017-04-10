@@ -175,9 +175,9 @@ describe Fastlane do
         expect(result).to eq("slather coverage --ignore Pods/\\* --ignore ../\\*\\*/\\*/Xcode\\* foo.xcodeproj")
       end
 
-      context 'when SharedValues::SCAN_FAILED_DUE_TO_EXCEPTION is true' do
-        it 'skip execution of slather' do
-          Fastlane::Actions.lane_context[Fastlane::Actions::SharedValues::SCAN_FAILED_DUE_TO_EXCEPTION] = true
+      context 'when SharedValues::SCAN_STATUS_EXCEPTION is true' do
+        it 'skipping slather' do
+          Fastlane::Actions.lane_context[Fastlane::Actions::SharedValues::SCAN_STATUS_EXCEPTION] = true
           result = Fastlane::FastFile.new.parse("lane :test do
             slather({
               scheme: 'Foo App',
