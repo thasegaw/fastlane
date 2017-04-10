@@ -37,7 +37,7 @@ module Fastlane
 
       def self.run(params)
         if Actions.lane_context[SharedValues::SCAN_STATUS_EXCEPTION]
-          UI.important("Skipping 'slather' because exception has occurred at 'scan'")
+          UI.important("Skipping 'slather' because 'scan' failed due to Exception")
           return
         end
 
