@@ -4,6 +4,7 @@ module Fastlane
       SCAN_DERIVED_DATA_PATH = :SCAN_DERIVED_DATA_PATH
       SCAN_GENERATED_PLIST_FILE = :SCAN_GENERATED_PLIST_FILE
       SCAN_GENERATED_PLIST_FILES = :SCAN_GENERATED_PLIST_FILES
+      SCAN_FAILED_DUE_TO_EXCEPTION = :SCAN_FAILED_DUE_TO_EXCEPTION
     end
 
     class ScanAction < Action
@@ -26,6 +27,7 @@ module Fastlane
           if values[:fail_build]
             raise ex
           end
+          Actions.lane_context[SharedValues::SCAN_FAILED_DUE_TO_EXCEPTION] = true
         ensure
           unless values[:derived_data_path].to_s.empty?
             Actions.lane_context[SharedValues::SCAN_DERIVED_DATA_PATH] = values[:derived_data_path]

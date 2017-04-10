@@ -42,6 +42,11 @@ module Fastlane
           Actions.verify_gem!('slather')
         end
 
+        if Actions.lane_context[SharedValues::SCAN_FAILED_DUE_TO_EXCEPTION]
+          UI.important('Skip slather action due to Scan was failed caused by Exception')
+          return
+        end
+
         validate_params!(params)
 
         command = build_command(params)
