@@ -14,8 +14,11 @@ module Gym
     # @param secondary_mapping [Hash] (optional) The secondary mapping (e.g. whatever is detected from the Xcode project)
     # @param export_method [String] The method that should be preferred in case there is a conflict
     def merge_profile_mapping(primary_mapping: nil, secondary_mapping: nil, export_method: nil)
+      primary_mapping = Hash[primary_mapping.map { |k, v| [k.to_s, v] }] if primary_mapping # convert hash keys to string
       final_mapping = (primary_mapping || {}).dup # for verbose output at the end of the method
       secondary_mapping ||= self.detect_project_profile_mapping # default to Xcode project
+
+      secondary_mapping = Hash[secondary_mapping.map { |k, v| [k.to_s, v] }] # convert hash keys to string
 
       # Now it's time to merge the (potentially) existing mapping
       #   (e.g. coming from `provisioningProfiles` of the `export_options` or from previous match calls)

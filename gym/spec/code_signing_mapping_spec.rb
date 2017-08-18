@@ -73,9 +73,33 @@ describe Gym::CodeSigningMapping do
       expect(result).to eq({ "identifier.1" => "value.1" })
     end
 
-    it "keeps both profiles if they don't conflict" do
+    it "keeps both profiles if they don't conflict (both keys are string)" do
       result = csm.merge_profile_mapping(primary_mapping: { "identifier.1" => "value.1" },
                                        secondary_mapping: { "identifier.2" => "value.2" },
+                                           export_method: "app-store")
+
+      expect(result).to eq({ "identifier.1" => "value.1", "identifier.2" => "value.2" })
+    end
+
+    it "keeps both profiles if they don't conflict (both keys are symbol)" do
+      result = csm.merge_profile_mapping(primary_mapping: { :"identifier.1" => "value.1" },
+                                       secondary_mapping: { :"identifier.2" => "value.2" },
+                                           export_method: "app-store")
+
+      expect(result).to eq({ "identifier.1" => "value.1", "identifier.2" => "value.2" })
+    end
+
+    it "keeps both profiles if they don't conflict (primary's key is symbol and secondary's key is string)" do
+      result = csm.merge_profile_mapping(primary_mapping: { :"identifier.1" => "value.1" },
+                                       secondary_mapping: { "identifier.2" => "value.2" },
+                                           export_method: "app-store")
+
+      expect(result).to eq({ "identifier.1" => "value.1", "identifier.2" => "value.2" })
+    end
+
+    it "keeps both profiles if they don't conflict (primary's key is string and secondary's key is symbol)" do
+      result = csm.merge_profile_mapping(primary_mapping: { "identifier.1" => "value.1" },
+                                       secondary_mapping: { :"identifier.2" => "value.2" },
                                            export_method: "app-store")
 
       expect(result).to eq({ "identifier.1" => "value.1", "identifier.2" => "value.2" })
