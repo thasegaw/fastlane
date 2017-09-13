@@ -276,6 +276,43 @@ module FastlaneCore
     # @!group Raw Access
     #####################################################
 
+    def build_xcodebuild_showbuildsettings_command_for_alltargets
+      # Examples:
+      #
+      # Build settings for action build and target target_A:
+      #     ACTION = build
+      #     .
+      #     .
+      #     arch = arm64
+      #     diagnostic_message_length = 203
+      #     variant = normal
+      #
+      # Build settings for action build and target "target B":
+      #     ACTION = build
+      #     AD_HOC_CODE_SIGNING_ALLOWED = NO
+      #     ALTERNATE_GROUP = staff
+      #     ALTERNATE_MODE = u+w,go-w,a+rX
+      #     ALTERNATE_OWNER = owner
+      #     .
+      #
+      project = if is_workspace
+                  options[:workspace].gsub(/\.xcworkspace/, '.xcodeproj')
+                else
+                  options[:project]
+                end
+
+      command = []
+      command << "xcodebuild -showBuildSettings"
+      command << "-project #{project}"
+      command << "-configuration #{options[:configuration].shellescape}" if options[:configuration]
+      command << "-xcconfig #{options[:xcconfig].shellescape}" if options[:xcconfig]
+      command << options[:xcargs] if options[:xcargs]
+      command << "-alltargets"
+      command << "clean" unless FastlaneCore::Helper.xcode_at_least?('8.3')
+      command << "2> /dev/null" if xcodebuild_suppress_stderr
+      command.join(' ')
+    end
+
     def build_xcodebuild_showbuildsettings_command
       # We also need to pass the workspace and scheme to this command.
       #
@@ -291,10 +328,56 @@ module FastlaneCore
       command
     end
 
+    def find_build_settings(settings: nil, key: nil, optional: true)
+      begin
+        result = settings.split("\n").find do |c|
+          sp = c.split(" = ")
+          next if sp.length == 0
+          sp.first.strip == key
+        end
+        return result.split(" = ").last
+      rescue => ex
+        return nil if optional # an optional value, we really don't care if something goes wrong
+        UI.error(caller.join("\n\t"))
+        UI.error("Could not fetch #{key} from project file: #{ex}")
+      end
+
+      nil
+    end
+
+    def run_xcodebuild_showbuildsettings(command)
+      timeout = FastlaneCore::Project.xcode_build_settings_timeout
+      retries = FastlaneCore::Project.xcode_build_settings_retries
+
+      # Xcode might hang here and retrying fixes the problem, see fastlane#4059
+      begin
+        FastlaneCore::Project.run_command(command, timeout: timeout, retries: retries, print: !self.xcodebuild_list_silent)
+      rescue Timeout::Error
+        raise FastlaneCore::Interface::FastlaneDependencyCausedException.new, "xcodebuild -showBuildSettings timed-out after #{timeout} seconds and #{retries} retries." \
+        " You can override the timeout value with the environment variable FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT," \
+        " and the number of retries with the environment variable FASTLANE_XCODEBUILD_SETTINGS_RETRIES ".red
+      end
+    end
+
     # Get the build settings for our project
     # e.g. to properly get the DerivedData folder
     # @param [String] The key of which we want the value for (e.g. "PRODUCT_NAME")
-    def build_settings(key: nil, optional: true)
+    def build_settings(key: nil, optional: true, target: nil)
+      if target
+        unless @build_settings_for_target
+          @build_settings_for_target = {}
+          settings = run_xcodebuild_showbuildsettings(build_xcodebuild_showbuildsettings_command_for_alltargets)
+          settings.split(/^$/).each do |section|
+            if section =~ /Build settings for action .+ and target "?(.+?)"?:/
+              current_target = $1
+              @build_settings_for_target[current_target] = section
+            end
+          end
+        end
+
+        return find_build_settings(settings: @build_settings_for_target[target], key: key, optional: optional)
+      end
+
       unless @build_settings
         if is_workspace
           if schemes.count == 0
@@ -303,38 +386,13 @@ module FastlaneCore
           options[:scheme] ||= schemes.first
         end
 
-        command = build_xcodebuild_showbuildsettings_command
-
-        # Xcode might hang here and retrying fixes the problem, see fastlane#4059
-        begin
-          timeout = FastlaneCore::Project.xcode_build_settings_timeout
-          retries = FastlaneCore::Project.xcode_build_settings_retries
-          @build_settings = FastlaneCore::Project.run_command(command, timeout: timeout, retries: retries, print: !self.xcodebuild_list_silent)
-          if @build_settings.empty?
-            UI.error("Could not read build settings. Make sure that the scheme \"#{options[:scheme]}\" is configured for running by going to Product → Scheme → Edit Scheme…, selecting the \"Build\" section, checking the \"Run\" checkbox and closing the scheme window.")
-          end
-        rescue Timeout::Error
-          raise FastlaneCore::Interface::FastlaneDependencyCausedException.new, "xcodebuild -showBuildSettings timed-out after #{timeout} seconds and #{retries} retries." \
-            " You can override the timeout value with the environment variable FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT," \
-            " and the number of retries with the environment variable FASTLANE_XCODEBUILD_SETTINGS_RETRIES ".red
+        @build_settings = run_xcodebuild_showbuildsettings(build_xcodebuild_showbuildsettings_command)
+        if @build_settings.empty?
+          UI.error("Could not read build settings. Make sure that the scheme \"#{options[:scheme]}\" is configured for running by going to Product → Scheme → Edit Scheme…, selecting the \"Build\" section, checking the \"Run\" checkbox and closing the scheme window.")
         end
       end
 
-      begin
-        result = @build_settings.split("\n").find do |c|
-          sp = c.split(" = ")
-          next if sp.length == 0
-          sp.first.strip == key
-        end
-        return result.split(" = ").last
-      rescue => ex
-        return nil if optional # an optional value, we really don't care if something goes wrong
-
-        UI.error(caller.join("\n\t"))
-        UI.error("Could not fetch #{key} from project file: #{ex}")
-      end
-
-      nil
+      return find_build_settings(settings: @build_settings, key: key, optional: optional)
     end
 
     # Returns the build settings and sets the default scheme to the options hash

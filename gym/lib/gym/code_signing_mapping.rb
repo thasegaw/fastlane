@@ -100,10 +100,6 @@ module Gym
       end
     end
 
-    def test_target?(build_settings)
-      return (!build_settings["TEST_TARGET_NAME"].nil? || !build_settings["TEST_HOST"].nil?)
-    end
-
     def detect_project_profile_mapping
       provisioning_profile_mapping = {}
       specified_configuration = Gym.config[:configuration] || Gym.project.default_build_settings(key: "CONFIGURATION")
@@ -119,29 +115,25 @@ module Gym
 
           project = Xcodeproj::Project.open(project_path)
           project.targets.each do |target|
-            target.build_configuration_list.build_configurations.each do |build_configuration|
-              current = build_configuration.build_settings
-              next if test_target?(current)
-              next unless specified_configuration == build_configuration.name
+            bundle_identifier = Gym.project.build_settings(target: target.name, key: "PRODUCT_BUNDLE_IDENTIFIER", optional: true)
+            next if bundle_identifier.nil?  # test target has no PRODUCT_BUNDLE_IDENTIFIER
 
-              bundle_identifier = build_configuration.resolve_build_setting("PRODUCT_BUNDLE_IDENTIFIER")
-              provisioning_profile_specifier = build_configuration.resolve_build_setting("PROVISIONING_PROFILE_SPECIFIER")
-              provisioning_profile_uuid = build_configuration.resolve_build_setting("PROVISIONING_PROFILE")
+            provisioning_profile_specifier = Gym.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE_SPECIFIER")
+            provisioning_profile_uuid = Gym.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE")
 
-              has_profile_specifier = provisioning_profile_specifier.to_s.length > 0
-              has_profile_uuid = provisioning_profile_uuid.to_s.length > 0
+            has_profile_specifier = provisioning_profile_specifier.to_s.length > 0
+            has_profile_uuid = provisioning_profile_uuid.to_s.length > 0
 
-              # Stores bundle identifiers that have already been mapped to inform user
-              if provisioning_profile_mapping[bundle_identifier] && (has_profile_specifier || has_profile_uuid)
-                bundle_identifiers_with_duplicates << bundle_identifier
-              end
+            # Stores bundle identifiers that have already been mapped to inform user
+            if provisioning_profile_mapping[bundle_identifier] && (has_profile_specifier || has_profile_uuid)
+              bundle_identifiers_with_duplicates << bundle_identifier
+            end
 
-              # Creates the mapping for a bundle identifier and profile specifier/uuid
-              if has_profile_specifier
-                provisioning_profile_mapping[bundle_identifier] = provisioning_profile_specifier
-              elsif has_profile_uuid
-                provisioning_profile_mapping[bundle_identifier] = provisioning_profile_uuid
-              end
+            # Creates the mapping for a bundle identifier and profile specifier/uuid
+            if has_profile_specifier
+              provisioning_profile_mapping[bundle_identifier] = provisioning_profile_specifier
+            elsif has_profile_uuid
+              provisioning_profile_mapping[bundle_identifier] = provisioning_profile_uuid
             end
 
             # Alerting user to explicitly specify a mapping if cannot be determined
@@ -163,7 +155,6 @@ module Gym
           end
         end
       end
-
       return provisioning_profile_mapping
     end
   end
