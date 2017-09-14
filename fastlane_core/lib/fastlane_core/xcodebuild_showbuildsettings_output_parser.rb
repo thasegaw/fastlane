@@ -1,6 +1,6 @@
 module FastlaneCore
   class XcodebuildShowbuildsettingsOutputParser
-    attr_reader :targets
+    attr_reader :settings
 
     # Examples:
     #
@@ -21,13 +21,17 @@ module FastlaneCore
     #     .
     #
     def initialize(output)
-      @targets = {}
+      @settings= {}
       output.split(/^$/).each do |section|
         if section =~ /Build settings for action .+ and target "?(.+?)"?:/
           current_target = $1
-          @targets[current_target] = section
+          @settings[current_target] = section
         end
       end
+    end
+
+    def [](key)
+      @settings[key]
     end
   end
 end

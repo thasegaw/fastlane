@@ -11,8 +11,6 @@ module FastlaneCore
     # Gets rid of annoying plugin info warnings.
     attr_accessor :xcodebuild_suppress_stderr
 
-    attr_accessor :list_result
-
     def initialize(options, xcodebuild_list_silent: false, xcodebuild_suppress_stderr: false)
       self.options = options
       self.xcodebuild_list_silent = xcodebuild_list_silent
@@ -35,7 +33,7 @@ module FastlaneCore
       begin
         timeout = FastlaneCore::Xcodebuild.settings_timeout
         retries = FastlaneCore::Xcodebuild.settings_retries
-        result = run_command(showbuildsettings_command, timeout: timeout, retries: retries)
+        result = FastlaneCore::Xcodebuild.run_command(showbuildsettings_command, timeout: timeout, retries: retries)
         @parsed_info = FastlaneCore::XcodebuildShowbuildsettingsOutputParser.new(result)
       rescue Timeout::Error
         raise FastlaneCore::Interface::FastlaneDependencyCausedException.new, "xcodebuild -showBuildSettings timed-out after #{timeout} seconds and #{retries} retries." \
@@ -70,7 +68,7 @@ module FastlaneCore
         timeout = FastlaneCore::Xcodebuild.settings_timeout
         retries = FastlaneCore::Xcodebuild.settings_retries
         command = list_command
-        result = run_command(list_command, timeout: timeout, retries: retries)
+        result = FastlaneCore::Xcodebuild.run_command(list_command, timeout: timeout, retries: retries)
         @list_info = FastlaneCore::XcodebuildListOutputParser.new(result)
       rescue Timeout::Error
         UI.user_error!("xcodebuild -list timed-out after #{timeout * retries} seconds. You might need to recreate the user schemes." \
@@ -117,7 +115,7 @@ module FastlaneCore
     # @returns the output of the command
     # Note: - currently affected by https://github.com/fastlane/fastlane/issues/1504
     #       - retry feature added to solve https://github.com/fastlane/fastlane/issues/4059
-    def run_command(command, timeout: 0, retries: 0, print: true)
+    def self.run_command(command, timeout: 0, retries: 0, print: true)
       require 'timeout'
 
       UI.command(command) if print

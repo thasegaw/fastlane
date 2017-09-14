@@ -66,6 +66,7 @@ module FastlaneCore
     # The config object containing the scheme, configuration, etc.
     attr_accessor :options
 
+    # Xcodebuild object
     attr_accessor :xcodebuild
 
     def initialize(options, xcodebuild_list_silent: false, xcodebuild_suppress_stderr: false)
@@ -284,7 +285,7 @@ module FastlaneCore
       end
 
       begin
-        result = @build_settings.targets[target].split("\n").find do |c|
+        result = @build_settings[target].split("\n").find do |c|
           sp = c.split(" = ")
           next if sp.length == 0
           sp.first.strip == key

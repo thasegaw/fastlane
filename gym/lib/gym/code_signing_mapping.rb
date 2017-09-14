@@ -102,7 +102,7 @@ module Gym
 
     def detect_project_profile_mapping
       provisioning_profile_mapping = {}
-      specified_configuration = Gym.config[:configuration] || Gym.project.default_build_settings(key: "CONFIGURATION")
+      specified_configuration = Gym.config[:configuration] || self.project.default_build_settings(key: "CONFIGURATION")
 
       self.project_paths.each do |project_path|
         UI.verbose("Parsing project file '#{project_path}' to find selected provisioning profiles")
@@ -115,11 +115,11 @@ module Gym
 
           project = Xcodeproj::Project.open(project_path)
           project.targets.each do |target|
-            next if Gym.project.test?(target: target.name)
+            next if self.project.test?(target: target.name)
 
-            bundle_identifier = Gym.project.build_settings(target: target.name, key: "PRODUCT_BUNDLE_IDENTIFIER")
-            provisioning_profile_specifier = Gym.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE_SPECIFIER")
-            provisioning_profile_uuid = Gym.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE")
+            bundle_identifier = self.project.build_settings(target: target.name, key: "PRODUCT_BUNDLE_IDENTIFIER")
+            provisioning_profile_specifier = self.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE_SPECIFIER")
+            provisioning_profile_uuid = self.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE")
 
             has_profile_specifier = provisioning_profile_specifier.to_s.length > 0
             has_profile_uuid = provisioning_profile_uuid.to_s.length > 0
