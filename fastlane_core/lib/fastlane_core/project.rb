@@ -66,19 +66,17 @@ module FastlaneCore
     # The config object containing the scheme, configuration, etc.
     attr_accessor :options
 
-    # Should the output of xcodebuild commands be silenced?
-    attr_accessor :xcodebuild_list_silent
-
-    # Should we redirect stderr to /dev/null for xcodebuild commands?
-    # Gets rid of annoying plugin info warnings.
-    attr_accessor :xcodebuild_suppress_stderr
+    attr_accessor :xcodebuild
 
     def initialize(options, xcodebuild_list_silent: false, xcodebuild_suppress_stderr: false)
       self.options = options
+      self.xcodebuild = FastlaneCore::Xcodebuild.new(
+        options,
+        xcodebuild_list_silent: xcodebuild_list_silent,
+        xcodebuild_suppress_stderr: xcodebuild_suppress_stderr
+      )
       self.path = File.expand_path(options[:workspace] || options[:project])
       self.is_workspace = (options[:workspace].to_s.length > 0)
-      self.xcodebuild_list_silent = xcodebuild_list_silent
-      self.xcodebuild_suppress_stderr = xcodebuild_suppress_stderr
 
       if !path or !File.directory?(path)
         UI.user_error!("Could not find project at path '#{path}'")
@@ -100,6 +98,10 @@ module FastlaneCore
     # Get all available schemes in an array
     def schemes
       parsed_info.schemes
+    end
+
+    def targets
+      parsed_info.targets
     end
 
     # Let the user select a scheme
@@ -194,8 +196,13 @@ module FastlaneCore
       (build_settings(key: "PRODUCT_TYPE") == "com.apple.product-type.framework")
     end
 
-    def application?
-      (build_settings(key: "PRODUCT_TYPE") == "com.apple.product-type.application")
+    def application?(target: nil)
+      (build_settings(key: "PRODUCT_TYPE", target: target) == "com.apple.product-type.application")
+    end
+
+    def test?(target: nil)
+      type = build_settings(key: "PRODUCT_TYPE", target: target)
+      (type == "com.apple.product-type.bundle.unit-test" || type == "com.apple.product-type.bundle.ui-testing")
     end
 
     def ios_library?
@@ -262,75 +269,22 @@ module FastlaneCore
       end.uniq.compact
     end
 
-    def xcodebuild_parameters
-      proj = []
-      proj << "-workspace #{options[:workspace].shellescape}" if options[:workspace]
-      proj << "-scheme #{options[:scheme].shellescape}" if options[:scheme]
-      proj << "-project #{options[:project].shellescape}" if options[:project]
-      proj << "-configuration #{options[:configuration].shellescape}" if options[:configuration]
-
-      return proj
-    end
-
     #####################################################
     # @!group Raw Access
     #####################################################
 
-    def build_xcodebuild_showbuildsettings_command_for_alltargets
-      # Examples:
-      #
-      # Build settings for action build and target target_A:
-      #     ACTION = build
-      #     .
-      #     .
-      #     arch = arm64
-      #     diagnostic_message_length = 203
-      #     variant = normal
-      #
-      # Build settings for action build and target "target B":
-      #     ACTION = build
-      #     AD_HOC_CODE_SIGNING_ALLOWED = NO
-      #     ALTERNATE_GROUP = staff
-      #     ALTERNATE_MODE = u+w,go-w,a+rX
-      #     ALTERNATE_OWNER = owner
-      #     .
-      #
-      project = if is_workspace
-                  options[:workspace].gsub(/\.xcworkspace/, '.xcodeproj')
-                else
-                  options[:project]
-                end
+    # Get the build settings for our project
+    # e.g. to properly get the DerivedData folder
+    # @param [String] The key of which we want the value for (e.g. "PRODUCT_NAME")
+    def build_settings(key: nil, optional: true, target: nil)
+      target ||= targets.first
 
-      command = []
-      command << "xcodebuild -showBuildSettings"
-      command << "-project #{project}"
-      command << "-configuration #{options[:configuration].shellescape}" if options[:configuration]
-      command << "-xcconfig #{options[:xcconfig].shellescape}" if options[:xcconfig]
-      command << options[:xcargs] if options[:xcargs]
-      command << "-alltargets"
-      command << "clean" unless FastlaneCore::Helper.xcode_at_least?('8.3')
-      command << "2> /dev/null" if xcodebuild_suppress_stderr
-      command.join(' ')
-    end
-
-    def build_xcodebuild_showbuildsettings_command
-      # We also need to pass the workspace and scheme to this command.
-      #
-      # The 'clean' portion of this command was a workaround for an xcodebuild bug with Core Data projects.
-      # This xcodebuild bug is fixed in Xcode 8.3 so 'clean' it's not necessary anymore
-      # See: https://github.com/fastlane/fastlane/pull/5626
-      if FastlaneCore::Helper.xcode_at_least?('8.3')
-        command = "xcodebuild -showBuildSettings #{xcodebuild_parameters.join(' ')}"
-      else
-        command = "xcodebuild clean -showBuildSettings #{xcodebuild_parameters.join(' ')}"
+      unless @build_settings
+        @build_settings = self.xcodebuild.showbuildsettings
       end
-      command += " 2> /dev/null" if xcodebuild_suppress_stderr
-      command
-    end
 
-    def find_build_settings(settings: nil, key: nil, optional: true)
       begin
-        result = settings.split("\n").find do |c|
+        result = @build_settings.targets[target].split("\n").find do |c|
           sp = c.split(" = ")
           next if sp.length == 0
           sp.first.strip == key
@@ -345,181 +299,17 @@ module FastlaneCore
       nil
     end
 
-    def run_xcodebuild_showbuildsettings(command)
-      timeout = FastlaneCore::Project.xcode_build_settings_timeout
-      retries = FastlaneCore::Project.xcode_build_settings_retries
-
-      # Xcode might hang here and retrying fixes the problem, see fastlane#4059
-      begin
-        FastlaneCore::Project.run_command(command, timeout: timeout, retries: retries, print: !self.xcodebuild_list_silent)
-      rescue Timeout::Error
-        raise FastlaneCore::Interface::FastlaneDependencyCausedException.new, "xcodebuild -showBuildSettings timed-out after #{timeout} seconds and #{retries} retries." \
-        " You can override the timeout value with the environment variable FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT," \
-        " and the number of retries with the environment variable FASTLANE_XCODEBUILD_SETTINGS_RETRIES ".red
-      end
-    end
-
-    # Get the build settings for our project
-    # e.g. to properly get the DerivedData folder
-    # @param [String] The key of which we want the value for (e.g. "PRODUCT_NAME")
-    def build_settings(key: nil, optional: true, target: nil)
-      if target
-        unless @build_settings_for_target
-          @build_settings_for_target = {}
-          settings = run_xcodebuild_showbuildsettings(build_xcodebuild_showbuildsettings_command_for_alltargets)
-          settings.split(/^$/).each do |section|
-            if section =~ /Build settings for action .+ and target "?(.+?)"?:/
-              current_target = $1
-              @build_settings_for_target[current_target] = section
-            end
-          end
-        end
-
-        return find_build_settings(settings: @build_settings_for_target[target], key: key, optional: optional)
-      end
-
-      unless @build_settings
-        if is_workspace
-          if schemes.count == 0
-            UI.user_error!("Could not find any schemes for Xcode workspace at path '#{self.path}'. Please make sure that the schemes you want to use are marked as `Shared` from Xcode.")
-          end
-          options[:scheme] ||= schemes.first
-        end
-
-        @build_settings = run_xcodebuild_showbuildsettings(build_xcodebuild_showbuildsettings_command)
-        if @build_settings.empty?
-          UI.error("Could not read build settings. Make sure that the scheme \"#{options[:scheme]}\" is configured for running by going to Product → Scheme → Edit Scheme…, selecting the \"Build\" section, checking the \"Run\" checkbox and closing the scheme window.")
-        end
-      end
-
-      return find_build_settings(settings: @build_settings, key: key, optional: optional)
-    end
-
     # Returns the build settings and sets the default scheme to the options hash
     def default_build_settings(key: nil, optional: true)
       options[:scheme] ||= schemes.first if is_workspace
       build_settings(key: key, optional: optional)
     end
 
-    def build_xcodebuild_list_command
-      # Unfortunately since we pass the workspace we also get all the
-      # schemes generated by CocoaPods
-      options = xcodebuild_parameters.delete_if { |a| a.to_s.include? "scheme" }
-      command = "xcodebuild -list #{options.join(' ')}"
-      command += " 2> /dev/null" if xcodebuild_suppress_stderr
-      command
-    end
-
-    def raw_info(silent: false)
-      # Examples:
-
-      # Standard:
-      #
-      # Information about project "Example":
-      #     Targets:
-      #         Example
-      #         ExampleUITests
-      #
-      #     Build Configurations:
-      #         Debug
-      #         Release
-      #
-      #     If no build configuration is specified and -scheme is not passed then "Release" is used.
-      #
-      #     Schemes:
-      #         Example
-      #         ExampleUITests
-
-      # CococaPods
-      #
-      # Example.xcworkspace
-      # Information about workspace "Example":
-      #     Schemes:
-      #         Example
-      #         HexColors
-      #         Pods-Example
-
-      return @raw if @raw
-
-      command = build_xcodebuild_list_command
-
-      # xcode >= 6 might hang here if the user schemes are missing
-      begin
-        timeout = FastlaneCore::Project.xcode_list_timeout
-        retries = FastlaneCore::Project.xcode_list_retries
-        @raw = FastlaneCore::Project.run_command(command, timeout: timeout, retries: retries, print: !silent)
-      rescue Timeout::Error
-        UI.user_error!("xcodebuild -list timed-out after #{timeout * retries} seconds. You might need to recreate the user schemes." \
-          " You can override the timeout value with the environment variable FASTLANE_XCODE_LIST_TIMEOUT")
-      end
-
-      UI.user_error!("Error parsing xcode file using `#{command}`") if @raw.length == 0
-
-      return @raw
-    end
-
-    # @internal to module
-    def self.xcode_list_timeout
-      (ENV['FASTLANE_XCODE_LIST_TIMEOUT'] || 10).to_i
-    end
-
-    # @internal to module
-    def self.xcode_list_retries
-      (ENV['FASTLANE_XCODE_LIST_RETRIES'] || 3).to_i
-    end
-
-    # @internal to module
-    def self.xcode_build_settings_timeout
-      (ENV['FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT'] || 10).to_i
-    end
-
-    # @internal to module
-    def self.xcode_build_settings_retries
-      (ENV['FASTLANE_XCODEBUILD_SETTINGS_RETRIES'] || 3).to_i
-    end
-
-    # @internal to module
-    # runs the specified command with the specified number of retries, killing each run if it times out
-    # @raises Timeout::Error if all tries result in a timeout
-    # @returns the output of the command
-    # Note: - currently affected by https://github.com/fastlane/fastlane/issues/1504
-    #       - retry feature added to solve https://github.com/fastlane/fastlane/issues/4059
-    def self.run_command(command, timeout: 0, retries: 0, print: true)
-      require 'timeout'
-
-      UI.command(command) if print
-
-      result = ''
-
-      total_tries = retries + 1
-      try = 1
-      begin
-        Timeout.timeout(timeout) do
-          # Using Helper.backticks didn't work here. `Timeout` doesn't time out, and the command hangs forever
-          result = `#{command}`.to_s
-        end
-      rescue Timeout::Error
-        try_limit_reached = try >= total_tries
-
-        message = "Command timed out after #{timeout} seconds on try #{try} of #{total_tries}"
-        message += ", trying again..." unless try_limit_reached
-
-        UI.important(message)
-
-        raise if try_limit_reached
-
-        try += 1
-        retry
-      end
-
-      return result
-    end
-
     private
 
     def parsed_info
       unless @parsed_info
-        @parsed_info = FastlaneCore::XcodebuildListOutputParser.new(raw_info(silent: xcodebuild_list_silent))
+        @parsed_info = self.xcodebuild.list
       end
       @parsed_info
     end

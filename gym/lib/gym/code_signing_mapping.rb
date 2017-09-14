@@ -115,9 +115,9 @@ module Gym
 
           project = Xcodeproj::Project.open(project_path)
           project.targets.each do |target|
-            bundle_identifier = Gym.project.build_settings(target: target.name, key: "PRODUCT_BUNDLE_IDENTIFIER", optional: true)
-            next if bundle_identifier.nil?  # test target has no PRODUCT_BUNDLE_IDENTIFIER
+            next if Gym.project.test?(target: target.name)
 
+            bundle_identifier = Gym.project.build_settings(target: target.name, key: "PRODUCT_BUNDLE_IDENTIFIER")
             provisioning_profile_specifier = Gym.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE_SPECIFIER")
             provisioning_profile_uuid = Gym.project.build_settings(target: target.name, key: "PROVISIONING_PROFILE")
 

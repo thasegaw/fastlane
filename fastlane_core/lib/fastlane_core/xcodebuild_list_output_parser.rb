@@ -4,6 +4,34 @@ module FastlaneCore
     attr_reader :schemes
     attr_reader :targets
 
+    # Examples:
+
+    # Standard:
+    #
+    # Information about project "Example":
+    #     Targets:
+    #         Example
+    #         ExampleUITests
+    #
+    #     Build Configurations:
+    #         Debug
+    #         Release
+    #
+    #     If no build configuration is specified and -scheme is not passed then "Release" is used.
+    #
+    #     Schemes:
+    #         Example
+    #         ExampleUITests
+
+    # CococaPods
+    #
+    # Example.xcworkspace
+    # Information about workspace "Example":
+    #     Schemes:
+    #         Example
+    #         HexColors
+    #         Pods-Example
+    #
     def initialize(output)
       @configurations = []
       @schemes = []
