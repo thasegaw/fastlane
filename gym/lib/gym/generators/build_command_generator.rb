@@ -23,7 +23,7 @@ module Gym
       # This will also include the scheme (if given)
       # @return [Array] The array with all the components to join
       def project_path_array
-        proj = Gym.project.xcodebuild_parameters
+        proj = Gym.project.xcodebuild.parameters
         return proj if proj.count > 0
         UI.user_error!("No project/workspace found")
       end

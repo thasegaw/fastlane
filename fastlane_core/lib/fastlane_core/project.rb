@@ -68,19 +68,49 @@ module FastlaneCore
 
     # Xcodebuild object
     attr_accessor :xcodebuild
+    attr_accessor :project_paths
+    attr_accessor :targets
 
     def initialize(options, xcodebuild_list_silent: false, xcodebuild_suppress_stderr: false)
       self.options = options
       self.xcodebuild = FastlaneCore::Xcodebuild.new(
         options,
-        xcodebuild_list_silent: xcodebuild_list_silent,
-        xcodebuild_suppress_stderr: xcodebuild_suppress_stderr
+        silent: xcodebuild_list_silent,
+        suppress_stderr: xcodebuild_suppress_stderr
       )
       self.path = File.expand_path(options[:workspace] || options[:project])
       self.is_workspace = (options[:workspace].to_s.length > 0)
 
       if !path or !File.directory?(path)
         UI.user_error!("Could not find project at path '#{path}'")
+      end
+    end
+
+    # Array of paths to all project files
+    # (might be multiple, because of workspaces)
+    def project_paths
+      return @_project_paths if @_project_paths
+      if is_workspace
+        # Find the xcodeproj file, as the information isn't included in the workspace file
+        # We have a reference to the workspace, let's find the xcodeproj file
+        # For some reason the `plist` gem can't parse the content file
+        # so we'll use a regex to find all group references
+
+        workspace_data_path = File.join(self.path, "contents.xcworkspacedata")
+        workspace_data = File.read(workspace_data_path)
+        @_project_paths = workspace_data.scan(/\"group:(.*)\"/).collect do |current_match|
+          # It's a relative path from the workspace file
+          File.join(File.expand_path("..", self.path), current_match.first)
+        end.find_all do |current_match|
+          # We're not interested in a `Pods` project, as it doesn't contain any relevant
+          # information about code signing
+          !current_match.end_with?("Pods/Pods.xcodeproj")
+        end
+
+        return @_project_paths
+      else
+        # Return the path as an array
+        return @_project_paths = [self.path]
       end
     end
 
@@ -102,7 +132,12 @@ module FastlaneCore
     end
 
     def targets
-      parsed_info.targets
+      return @targets if @targets
+      @targets = []
+      Xcodeproj::Project.open(self.project_paths.first).targets.each do |target|
+        @targets << target.name
+      end
+      @targets
     end
 
     # Let the user select a scheme

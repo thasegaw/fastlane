@@ -296,23 +296,24 @@ describe FastlaneCore do
     end
 
     describe "build_settings() can handle empty lines" do
-      it "SUPPORTED_PLATFORMS should be iphonesimulator iphoneos on Xcode >= 8.3" do
+      let(:project) do
         options = { project: "./fastlane_core/spec/fixtures/projects/Example.xcodeproj" }
-        @project = FastlaneCore::Project.new(options, xcodebuild_list_silent: true, xcodebuild_suppress_stderr: true)
+        FastlaneCore::Project.new(options, xcodebuild_list_silent: true, xcodebuild_suppress_stderr: true)
+      end
+
+      it "SUPPORTED_PLATFORMS should be iphonesimulator iphoneos on Xcode >= 8.3" do
         expect(FastlaneCore::Helper).to receive(:xcode_at_least?).and_return(true)
-        command = "xcodebuild -showBuildSettings -project ./fastlane_core/spec/fixtures/projects/Example.xcodeproj 2> /dev/null"
+        command = "xcodebuild -showBuildSettings -alltargets -project ./fastlane_core/spec/fixtures/projects/Example.xcodeproj 2> /dev/null"
         expect(FastlaneCore::Xcodebuild).to receive(:run_command).with(command.to_s, { timeout: 10, retries: 3, print: false }).and_return(File.read("./fastlane_core/spec/fixtures/projects/build_settings_with_toolchains"))
 
-        expect(@project.build_settings(key: "SUPPORTED_PLATFORMS")).to eq("iphonesimulator iphoneos")
+        expect(project.build_settings(key: "SUPPORTED_PLATFORMS", target: 'app')).to eq("iphonesimulator iphoneos")
       end
 
       it "SUPPORTED_PLATFORMS should be iphonesimulator iphoneos on Xcode < 8.3" do
-        options = { project: "./fastlane_core/spec/fixtures/projects/Example.xcodeproj" }
-        @project = FastlaneCore::Project.new(options, xcodebuild_list_silent: true, xcodebuild_suppress_stderr: true)
         expect(FastlaneCore::Helper).to receive(:xcode_at_least?).and_return(false)
-        command = "xcodebuild clean -showBuildSettings -project ./fastlane_core/spec/fixtures/projects/Example.xcodeproj 2> /dev/null"
+        command = "xcodebuild -showBuildSettings -alltargets -project ./fastlane_core/spec/fixtures/projects/Example.xcodeproj clean 2> /dev/null"
         expect(FastlaneCore::Xcodebuild).to receive(:run_command).with(command.to_s, { timeout: 10, retries: 3, print: false }).and_return(File.read("./fastlane_core/spec/fixtures/projects/build_settings_with_toolchains"))
-        expect(@project.build_settings(key: "SUPPORTED_PLATFORMS")).to eq("iphonesimulator iphoneos")
+        expect(project.build_settings(key: "SUPPORTED_PLATFORMS", target: 'app')).to eq("iphonesimulator iphoneos")
       end
     end
 
@@ -346,30 +347,6 @@ describe FastlaneCore do
 
       it "PRODUCT_BUNDLE_IDENTIFIER should be tools.fastlane.app.special" do
         expect(@project.build_settings(key: "PRODUCT_BUNDLE_IDENTIFIER")).to eq("tools.fastlane.app.special")
-      end
-    end
-
-    describe 'xcodebuild_list_silent option' do
-      it 'is not silent by default' do
-        project = FastlaneCore::Project.new(
-          { project: "./fastlane_core/spec/fixtures/projects/Example.xcodeproj" },
-          xcodebuild_suppress_stderr: true
-        )
-
-        expect(project).to receive(:raw_info).with(silent: false).and_call_original
-
-        project.configurations
-      end
-
-      it 'makes the raw_info method be silent if configured' do
-        project = FastlaneCore::Project.new(
-          { project: "./fastlane_core/spec/fixtures/projects/Example.xcodeproj" },
-          xcodebuild_list_silent: true,
-          xcodebuild_suppress_stderr: true
-        )
-        expect(project).to receive(:raw_info).with(silent: true).and_call_original
-
-        project.configurations
       end
     end
   end

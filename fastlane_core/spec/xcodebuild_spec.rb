@@ -72,7 +72,7 @@ describe FastlaneCore do
       it 'generates an xcodebuild -list command that redirects stderr to /dev/null' do
         xcodebuild = FastlaneCore::Xcodebuild.new(
           { options: { xcodebuild: "./fastlane_core/spec/fixtures/xcodebuilds/Example.xcodeproj" } },
-          xcodebuild_suppress_stderr: true
+          suppress_stderr: true
         )
         expect(xcodebuild.list_command).to match(%r{2> /dev/null})
       end
@@ -85,7 +85,7 @@ describe FastlaneCore do
       it 'generates an xcodebuild -showBuildSettings command that redirects stderr to /dev/null' do
         xcodebuild = FastlaneCore::Xcodebuild.new(
           { xcodebuild: "./fastlane_core/spec/fixtures/xcodebuilds/Example.xcodeproj" },
-          xcodebuild_suppress_stderr: true
+          suppress_stderr: true
         )
         expect(xcodebuild.showbuildsettings_command).to match(%r{2> /dev/null})
       end
@@ -136,5 +136,27 @@ describe FastlaneCore do
       end
     end
 
+    #describe 'xcodebuild_list_silent option' do
+    #  it 'is not silent by default' do
+    #    xcodebuild = FastlaneCore::Xcodebuild.new(
+    #      { project: "./fastlane_core/spec/fixtures/projects/Example.xcodeproj" },
+    #      suppress_stderr: true
+    #    )
+
+    #    expect(xcodebuild).to receive(:raw_info).with(silent: false).and_call_original
+    #    project.configurations
+    #  end
+
+    #  it 'makes the raw_info method be silent if configured' do
+    #    xcodebuild = FastlaneCore::Xcodebuild.new(
+    #      { project: "./fastlane_core/spec/fixtures/projects/Example.xcodeproj" },
+    #      silent: true,
+    #      suppress_stderr: true
+    #    )
+    #    expect(xcodebuild).to receive(:raw_info).with(silent: true).and_call_original
+
+    #    project.configurations
+    #  end
+    #end
   end
 end
