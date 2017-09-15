@@ -68,7 +68,8 @@ module FastlaneCore
 
     # Xcodebuild object
     attr_accessor :xcodebuild
-    attr_accessor :project_paths
+
+    # target list
     attr_accessor :targets
 
     def initialize(options, xcodebuild_list_silent: false, xcodebuild_suppress_stderr: false)

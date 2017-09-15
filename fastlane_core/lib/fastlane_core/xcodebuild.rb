@@ -37,7 +37,7 @@ module FastlaneCore
         @parsed_info = FastlaneCore::XcodebuildShowbuildsettingsOutputParser.new(result)
       rescue Timeout::Error
         raise FastlaneCore::Interface::FastlaneDependencyCausedException.new, "xcodebuild -showBuildSettings timed-out after #{timeout} seconds and #{retries} retries." \
-        " You can override the timeout value with the environment variable FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT," \
+          " You can override the timeout value with the environment variable FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT," \
           " and the number of retries with the environment variable FASTLANE_XCODEBUILD_SETTINGS_RETRIES ".red
       end
       @parsed_info
@@ -67,7 +67,6 @@ module FastlaneCore
       begin
         timeout = FastlaneCore::Xcodebuild.settings_timeout
         retries = FastlaneCore::Xcodebuild.settings_retries
-        command = list_command
         result = FastlaneCore::Xcodebuild.run_command(list_command, timeout: timeout, retries: retries, print: !self.silent)
         @list_info = FastlaneCore::XcodebuildListOutputParser.new(result)
       rescue Timeout::Error
